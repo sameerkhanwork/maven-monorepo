@@ -512,8 +512,9 @@ jobs:
               "GROUP_ID=com.ai.connector",
               "ARTIFACT_ID=connector-teams",
               "VERSION=$(aws codeartifact list-package-versions \
-                --domain ${{ secrets.AWS_REGION }} \
-                --domain-owner ${{ secrets.AWS_CODEARTIFACT_DOMAIN }} \
+                --region ${{ secrets.AWS_REGION }} \
+                --domain ${{ secrets.AWS_CODEARTIFACT_DOMAIN }} \
+                --domain-owner ${{ secrets.AWS_ACCOUNT_ID }} \
                 --repository ${{ env.REPO_TEAMS }} \
                 --package $ARTIFACT_ID \
                 --namespace $GROUP_ID \
