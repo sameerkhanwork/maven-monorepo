@@ -462,7 +462,7 @@ jobs:
               sudo systemctl enable \\${SERVICE_NAME};
               sudo systemctl status \\${SERVICE_NAME} --no-pager;
               sudo journalctl -u \\${SERVICE_NAME} -n 50 --no-pager;
-              \"'
+              \"
             ]' --output json | jq -r '.Command.CommandId')
           echo "SSM Command ID: $COMMAND_ID"
           aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "${EC2_ID}"
@@ -550,7 +550,7 @@ jobs:
               sudo systemctl enable \\${SERVICE_NAME};
               sudo systemctl status \\${SERVICE_NAME} --no-pager;
               sudo journalctl -u \\${SERVICE_NAME} -n 50 --no-pager;
-              \"'
+              \"
             ]' --output json | jq -r '.Command.CommandId')
           echo "SSM Command ID: $COMMAND_ID"
           aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "${EC2_ID}"
