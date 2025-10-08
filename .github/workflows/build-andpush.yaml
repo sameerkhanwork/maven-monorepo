@@ -421,7 +421,7 @@ jobs:
                 --package $ARTIFACT_ID \
                 --namespace $GROUP_ID \
                 --format maven \
-                --query \"sort_by(versions, &publishedTime)[-1].version\" \
+                --query \"versions[-1].version\" \
                 --output text)",
               "echo Detected version: $VERSION",
               "echo Creating deploy dir",
@@ -518,7 +518,7 @@ jobs:
                 --package $ARTIFACT_ID \
                 --namespace $GROUP_ID \
                 --format maven \
-                --query \"sort_by(versions, &publishedTime)[-1].version\" \
+                --query \"versions[-1].version\" \
                 --output text)",
               "echo Detected version: $VERSION",
               "mkdir -p $DEPLOY_DIR",
