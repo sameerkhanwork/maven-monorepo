@@ -411,7 +411,7 @@ jobs:
               "APP_NAME=connector-slack.jar",
               "SERVICE_NAME=slack-service",
               "DEPLOY_DIR=/home/ssm-user/app/slack",
-              "GROUP_ID=org.springframework",
+              "GROUP_ID=com.ai.connector",
               "ARTIFACT_ID=connector-slack",
               "VERSION=$(aws codeartifact list-package-versions \
                 --region ${{ secrets.AWS_REGION }} \
@@ -509,7 +509,7 @@ jobs:
               "APP_NAME=connector-teams.jar",
               "SERVICE_NAME=teams-service",
               "DEPLOY_DIR=/home/ssm-user/app/teams",
-              "GROUP_ID=org.springframework",
+              "GROUP_ID=com.ai.connector",
               "ARTIFACT_ID=connector-teams",
               "VERSION=$(aws codeartifact list-package-versions \
                 --domain ${{ secrets.AWS_REGION }} \
