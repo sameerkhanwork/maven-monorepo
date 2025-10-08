@@ -400,46 +400,48 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --comment "Deploy Slack connector from CodeArtifact and manage systemd" \
             --parameters 'commands=[
-              "bash -c \"set -euo pipefail;
-              APP_NAME=connector-slack.jar;
-              SERVICE_NAME=slack-service;
-              DEPLOY_DIR=/home/ssm-user/app/slack;
-              GROUP_ID=org.springframework;
-              ARTIFACT_ID=connector-slack;
-              # auto-detect latest version (most recently published)
-              VERSION=\\$(aws codeartifact list-package-versions \
-                --domain '"'"${DOMAIN}"'"' \
-                --domain-owner '"'"${DOMAIN_OWNER}"'"' \
-                --repository '"'"${REPO}"'"' \
-                --package '"'"${ARTIFACT_ID}"'"' \
-                --namespace '"'"${GROUP_ID}"'"' \
+              "set -e",
+              "APP_NAME=connector-slack.jar",
+              "SERVICE_NAME=slack-service",
+              "DEPLOY_DIR=/home/ssm-user/app/slack",
+              "GROUP_ID=org.springframework",
+              "ARTIFACT_ID=connector-slack",
+              "VERSION=$(aws codeartifact list-package-versions \
+                --domain ${DOMAIN} \
+                --domain-owner ${DOMAIN_OWNER} \
+                --repository ${REPO} \
+                --package ${ARTIFACT_ID} \
+                --namespace ${GROUP_ID} \
                 --format maven \
                 --query \"sort_by(versions, &publishedTime)[-1].version\" \
-                --output text);
-              echo Detected version: \\$VERSION;
-              echo Creating deploy dir; mkdir -p \\$DEPLOY_DIR;
-              ASSET=\\$(aws codeartifact list-package-version-assets \
-                --domain '"'"${DOMAIN}"'"' \
-                --domain-owner '"'"${DOMAIN_OWNER}"'"' \
-                --repository '"'"${REPO}"'"' \
+                --output text)",
+              "echo Detected version: $VERSION",
+              "echo Creating deploy dir",
+              "mkdir -p $DEPLOY_DIR",
+              "ASSET=$(aws codeartifact list-package-version-assets \
+                --region ${AWS_REGION} \
+                --domain ${DOMAIN} \
+                --domain-owner ${DOMAIN_OWNER} \
+                --repository ${REPO} \
                 --format maven \
-                --namespace \\$GROUP_ID \
-                --package \\$ARTIFACT_ID \
-                --package-version \\$VERSION \
-                --query \"assets[?ends_with(name, \\\`.jar\\\`)].name\" \
-                --output text);
-              echo Found asset: \\$ASSET;
-              aws codeartifact get-package-version-asset \
-                --domain '"'"${DOMAIN}"'"' \
-                --domain-owner '"'"${DOMAIN_OWNER}"'"' \
-                --repository '"'"${REPO}"'"' \
+                --namespace $GROUP_ID \
+                --package $ARTIFACT_ID \
+                --package-version $VERSION \
+                --query \"assets[?ends_with(name, \`.jar\`)].name\" \
+                --output text)",
+              "echo Found asset: $ASSET",
+              "aws codeartifact get-package-version-asset \
+                --region ${AWS_REGION} \
+                --domain ${DOMAIN} \
+                --domain-owner ${DOMAIN_OWNER} \
+                --repository ${REPO} \
                 --format maven \
-                --namespace \\$GROUP_ID \
-                --package \\$ARTIFACT_ID \
-                --package-version \\$VERSION \
-                --asset \\$ASSET \\$DEPLOY_DIR/\\$APP_NAME;
-              echo Writing systemd unit for \\$SERVICE_NAME;
-              sudo bash -c \"cat > /etc/systemd/system/\\${SERVICE_NAME}.service <<'EOL'
+                --namespace $GROUP_ID \
+                --package $ARTIFACT_ID \
+                --package-version $VERSION \
+                --asset $ASSET $DEPLOY_DIR/$APP_NAME",
+              "echo Writing systemd unit for $SERVICE_NAME",
+              "cat <<EOF | sudo tee /etc/systemd/system/${SERVICE_NAME}.service
           [Unit]
           Description=Slack Connector Service
           After=network.target
@@ -451,19 +453,18 @@ jobs:
           SuccessExitStatus=143
           Restart=always
           RestartSec=5
-          Environment=SPRING_PROFILES_ACTIVE=uat
 
           [Install]
           WantedBy=multi-user.target
-          EOL\";
-              sudo systemctl daemon-reload;
-              sudo systemctl stop \\${SERVICE_NAME} || true;
-              sudo systemctl start \\${SERVICE_NAME};
-              sudo systemctl enable \\${SERVICE_NAME};
-              sudo systemctl status \\${SERVICE_NAME} --no-pager;
-              sudo journalctl -u \\${SERVICE_NAME} -n 50 --no-pager;
-              \"
-            ]' --output json | jq -r '.Command.CommandId')
+          EOF",
+              "sudo systemctl daemon-reload",
+              "sudo systemctl stop ${SERVICE_NAME} || true",
+              "sudo systemctl start ${SERVICE_NAME}",
+              "sudo systemctl enable ${SERVICE_NAME}",
+              "sudo systemctl status ${SERVICE_NAME} --no-pager",
+              "sudo journalctl -u ${SERVICE_NAME} -n 50 --no-pager"
+            ]' \
+            --output json | jq -r '.Command.CommandId')
           echo "SSM Command ID: $COMMAND_ID"
           aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "${EC2_ID}"
 
@@ -490,44 +491,46 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --comment "Deploy Teams connector from CodeArtifact and manage systemd" \
             --parameters 'commands=[
-              "bash -c \"set -euo pipefail;
-              APP_NAME=connector-teams.jar;
-              SERVICE_NAME=teams-service;
-              DEPLOY_DIR=/home/ssm-user/app/teams;
-              GROUP_ID=org.springframework;
-              ARTIFACT_ID=connector-teams;
-              VERSION=\\$(aws codeartifact list-package-versions \
-                --domain '"'"${DOMAIN}"'"' \
-                --domain-owner '"'"${DOMAIN_OWNER}"'"' \
-                --repository '"'"${REPO}"'"' \
-                --package '"'"${ARTIFACT_ID}"'"' \
-                --namespace '"'"${GROUP_ID}"'"' \
+              "set -e",
+              "APP_NAME=connector-teams.jar",
+              "SERVICE_NAME=teams-service",
+              "DEPLOY_DIR=/home/ssm-user/app/teams",
+              "GROUP_ID=org.springframework",
+              "ARTIFACT_ID=connector-teams",
+              "VERSION=$(aws codeartifact list-package-versions \
+                --domain ${DOMAIN} \
+                --domain-owner ${DOMAIN_OWNER} \
+                --repository ${REPO} \
+                --package ${ARTIFACT_ID} \
+                --namespace ${GROUP_ID} \
                 --format maven \
                 --query \"sort_by(versions, &publishedTime)[-1].version\" \
-                --output text);
-              echo Detected version: \\$VERSION;
-              mkdir -p \\$DEPLOY_DIR;
-              ASSET=\\$(aws codeartifact list-package-version-assets \
-                --domain '"'"${DOMAIN}"'"' \
-                --domain-owner '"'"${DOMAIN_OWNER}"'"' \
-                --repository '"'"${REPO}"'"' \
+                --output text)",
+              "echo Detected version: $VERSION",
+              "mkdir -p $DEPLOY_DIR",
+              "ASSET=$(aws codeartifact list-package-version-assets \
+                --region ${AWS_REGION} \
+                --domain ${DOMAIN} \
+                --domain-owner ${DOMAIN_OWNER} \
+                --repository ${REPO} \
                 --format maven \
-                --namespace \\$GROUP_ID \
-                --package \\$ARTIFACT_ID \
-                --package-version \\$VERSION \
-                --query \"assets[?ends_with(name, \\\`.jar\\\`)].name\" \
-                --output text);
-              echo Found asset: \\$ASSET;
-              aws codeartifact get-package-version-asset \
-                --domain '"'"${DOMAIN}"'"' \
-                --domain-owner '"'"${DOMAIN_OWNER}"'"' \
-                --repository '"'"${REPO}"'"' \
+                --namespace $GROUP_ID \
+                --package $ARTIFACT_ID \
+                --package-version $VERSION \
+                --query \"assets[?ends_with(name, \`.jar\`)].name\" \
+                --output text)",
+              "echo Found asset: $ASSET",
+              "aws codeartifact get-package-version-asset \
+                --region ${AWS_REGION} \
+                --domain ${DOMAIN} \
+                --domain-owner ${DOMAIN_OWNER} \
+                --repository ${REPO} \
                 --format maven \
-                --namespace \\$GROUP_ID \
-                --package \\$ARTIFACT_ID \
-                --package-version \\$VERSION \
-                --asset \\$ASSET \\$DEPLOY_DIR/\\$APP_NAME;
-              sudo bash -c \"cat > /etc/systemd/system/\\${SERVICE_NAME}.service <<'EOL'
+                --namespace $GROUP_ID \
+                --package $ARTIFACT_ID \
+                --package-version $VERSION \
+                --asset $ASSET $DEPLOY_DIR/$APP_NAME",
+              "cat <<EOF | sudo tee /etc/systemd/system/${SERVICE_NAME}.service
           [Unit]
           Description=Teams Connector Service
           After=network.target
@@ -543,14 +546,14 @@ jobs:
 
           [Install]
           WantedBy=multi-user.target
-          EOL\";
-              sudo systemctl daemon-reload;
-              sudo systemctl stop \\${SERVICE_NAME} || true;
-              sudo systemctl start \\${SERVICE_NAME};
-              sudo systemctl enable \\${SERVICE_NAME};
-              sudo systemctl status \\${SERVICE_NAME} --no-pager;
-              sudo journalctl -u \\${SERVICE_NAME} -n 50 --no-pager;
-              \"
-            ]' --output json | jq -r '.Command.CommandId')
+          EOF",
+              "sudo systemctl daemon-reload",
+              "sudo systemctl stop ${SERVICE_NAME} || true",
+              "sudo systemctl start ${SERVICE_NAME}",
+              "sudo systemctl enable ${SERVICE_NAME}",
+              "sudo systemctl status ${SERVICE_NAME} --no-pager",
+              "sudo journalctl -u ${SERVICE_NAME} -n 50 --no-pager"
+            ]' \
+            --output json | jq -r '.Command.CommandId')
           echo "SSM Command ID: $COMMAND_ID"
           aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "${EC2_ID}"
