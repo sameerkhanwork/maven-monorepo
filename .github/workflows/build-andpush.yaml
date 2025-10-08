@@ -386,6 +386,13 @@ jobs:
     if: ${{ needs.build-and-publish-slack.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
       - name: Deploy Slack on EC2 via SSM (systemd)
         env:
           EC2_ID: ${{ secrets.EC2_INSTANCE_ID }}
@@ -477,6 +484,12 @@ jobs:
     if: ${{ needs.build-and-publish-teams.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
       - name: Deploy Teams on EC2 via SSM (systemd)
         env:
           EC2_ID: ${{ secrets.EC2_INSTANCE_ID }}
