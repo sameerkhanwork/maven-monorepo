@@ -108,20 +108,20 @@ jobs:
           <settings>
             <servers>
               <server>
-                <id>codeartifact-common</id>
+                <id>my-domain-common-lib</id>
                 <username>aws</username>
                 <password>${CODEARTIFACT_AUTH_TOKEN}</password>
               </server>
             </servers>
             <profiles>
               <profile>
-                <id>codeartifact-common</id>
+                <id>my-domain-common-lib</id>
                 <activation>
                   <activeByDefault>true</activeByDefault>
                 </activation>
                 <repositories>
                   <repository>
-                    <id>codeartifact-common</id>
+                    <id>my-domain-common-lib</id>
                     <url>${CODEARTIFACT_REPO_ENDPOINT}</url>
                   </repository>
                 </repositories>
@@ -204,29 +204,29 @@ jobs:
           <settings>
             <servers>
               <server>
-                <id>codeartifact-common</id>
+                <id>my-domain-common-lib</id>
                 <username>aws</username>
                 <password>${CODEARTIFACT_AUTH_TOKEN}</password>
               </server>
               <server>
-                <id>codeartifact-slack</id>
+                <id>my-domain-connector-slack</id>
                 <username>aws</username>
                 <password>${CODEARTIFACT_AUTH_TOKEN}</password>
               </server>
             </servers>
             <profiles>
               <profile>
-                <id>codeartifact-slack</id>
+                <id>my-domain-connector-slack</id>
                 <activation>
                   <activeByDefault>true</activeByDefault>
                 </activation>
                 <repositories>
                   <repository>
-                    <id>codeartifact-common</id>
+                    <id>my-domain-common-lib</id>
                     <url>${COMMON_REPO_ENDPOINT}</url>
                   </repository>
                   <repository>
-                    <id>codeartifact-slack</id>
+                    <id>my-domain-connector-slack</id>
                     <url>${CODEARTIFACT_REPO_ENDPOINT}</url>
                   </repository>
                 </repositories>
@@ -308,29 +308,29 @@ jobs:
           <settings>
             <servers>
               <server>
-                <id>codeartifact-common</id>
+                <id>my-domain-common-lib</id>
                 <username>aws</username>
                 <password>${CODEARTIFACT_AUTH_TOKEN}</password>
               </server>            
               <server>
-                <id>codeartifact-teams</id>
+                <id>my-domain-connector-teams</id>
                 <username>aws</username>
                 <password>${CODEARTIFACT_AUTH_TOKEN}</password>
               </server>
             </servers>
             <profiles>
               <profile>
-                <id>codeartifact-teams</id>
+                <id>my-domain-connector-teams</id>
                 <activation>
                   <activeByDefault>true</activeByDefault>
                 </activation>
                 <repositories>
                   <repository>
-                    <id>codeartifact-common</id>
+                    <id>my-domain-common-lib</id>
                     <url>${COMMON_REPO_ENDPOINT}</url>
                   </repository>
                   <repository>
-                    <id>codeartifact-teams</id>
+                    <id>my-domain-connector-teams</id>
                     <url>${CODEARTIFACT_REPO_ENDPOINT}</url>
                   </repository>
                 </repositories>
