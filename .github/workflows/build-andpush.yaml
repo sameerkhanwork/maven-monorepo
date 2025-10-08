@@ -414,12 +414,12 @@ jobs:
               "GROUP_ID=org.springframework",
               "ARTIFACT_ID=connector-slack",
               "VERSION=$(aws codeartifact list-package-versions \
-                --region ${AWS_REGION} \
-                --domain ${DOMAIN} \
-                --domain-owner ${DOMAIN_OWNER} \
-                --repository ${REPO} \
-                --package ${ARTIFACT_ID} \
-                --namespace ${GROUP_ID} \
+                --region ${{ secrets.AWS_REGION }} \
+                --domain ${{ secrets.AWS_CODEARTIFACT_DOMAIN }} \
+                --domain-owner ${{ secrets.AWS_ACCOUNT_ID }} \
+                --repository ${{ env.REPO_SLACK }} \
+                --package $ARTIFACT_ID \
+                --namespace $GROUP_ID \
                 --format maven \
                 --query \"sort_by(versions, &publishedTime)[-1].version\" \
                 --output text)",
@@ -427,10 +427,10 @@ jobs:
               "echo Creating deploy dir",
               "mkdir -p $DEPLOY_DIR",
               "ASSET=$(aws codeartifact list-package-version-assets \
-                --region ${AWS_REGION} \
-                --domain ${DOMAIN} \
-                --domain-owner ${DOMAIN_OWNER} \
-                --repository ${REPO} \
+                --region ${{ secrets.AWS_REGION }} \
+                --domain ${{ secrets.AWS_CODEARTIFACT_DOMAIN }} \
+                --domain-owner ${{ secrets.AWS_ACCOUNT_ID }} \
+                --repository ${{ env.REPO_SLACK }} \
                 --format maven \
                 --namespace $GROUP_ID \
                 --package $ARTIFACT_ID \
@@ -439,10 +439,10 @@ jobs:
                 --output text)",
               "echo Found asset: $ASSET",
               "aws codeartifact get-package-version-asset \
-                --region ${AWS_REGION} \
-                --domain ${DOMAIN} \
-                --domain-owner ${DOMAIN_OWNER} \
-                --repository ${REPO} \
+                --region ${{ secrets.AWS_REGION }} \
+                --domain ${{ secrets.AWS_CODEARTIFACT_DOMAIN }} \
+                --domain-owner ${{ secrets.AWS_ACCOUNT_ID }} \
+                --repository ${{ env.REPO_SLACK }} \
                 --format maven \
                 --namespace $GROUP_ID \
                 --package $ARTIFACT_ID \
@@ -500,8 +500,8 @@ jobs:
           REPO: ${{ env.REPO_TEAMS }}
         run: |
           COMMAND_ID=$(aws ssm send-command \
-            --targets "Key=instanceIds,Values=${EC2_ID}" \
-            --region ${AWS_REGION} \
+            --targets "Key=instanceIds,Values=${{ secrets.EC2_INSTANCE_ID }}" \
+            --region ${{ secrets.AWS_REGION }} \
             --document-name "AWS-RunShellScript" \
             --comment "Deploy Teams connector from CodeArtifact and manage systemd" \
             --parameters 'commands=[
@@ -512,21 +512,21 @@ jobs:
               "GROUP_ID=org.springframework",
               "ARTIFACT_ID=connector-teams",
               "VERSION=$(aws codeartifact list-package-versions \
-                --domain ${DOMAIN} \
-                --domain-owner ${DOMAIN_OWNER} \
-                --repository ${REPO} \
-                --package ${ARTIFACT_ID} \
-                --namespace ${GROUP_ID} \
+                --domain ${{ secrets.AWS_REGION }} \
+                --domain-owner ${{ secrets.AWS_CODEARTIFACT_DOMAIN }} \
+                --repository ${{ env.REPO_TEAMS }} \
+                --package $ARTIFACT_ID \
+                --namespace $GROUP_ID \
                 --format maven \
                 --query \"sort_by(versions, &publishedTime)[-1].version\" \
                 --output text)",
               "echo Detected version: $VERSION",
               "mkdir -p $DEPLOY_DIR",
               "ASSET=$(aws codeartifact list-package-version-assets \
-                --region ${AWS_REGION} \
-                --domain ${DOMAIN} \
-                --domain-owner ${DOMAIN_OWNER} \
-                --repository ${REPO} \
+                --region ${{ secrets.AWS_REGION }} \
+                --domain ${{ secrets.AWS_CODEARTIFACT_DOMAIN }} \
+                --domain-owner ${{ secrets.AWS_ACCOUNT_ID }} \
+                --repository ${{ env.REPO_TEAMS }} \
                 --format maven \
                 --namespace $GROUP_ID \
                 --package $ARTIFACT_ID \
@@ -535,10 +535,10 @@ jobs:
                 --output text)",
               "echo Found asset: $ASSET",
               "aws codeartifact get-package-version-asset \
-                --region ${AWS_REGION} \
-                --domain ${DOMAIN} \
-                --domain-owner ${DOMAIN_OWNER} \
-                --repository ${REPO} \
+                --region ${{ secrets.AWS_REGION }} \
+                --domain ${{ secrets.AWS_CODEARTIFACT_DOMAIN }} \
+                --domain-owner ${{ secrets.AWS_ACCOUNT_ID }} \
+                --repository ${{ env.REPO_TEAMS }} \
                 --format maven \
                 --namespace $GROUP_ID \
                 --package $ARTIFACT_ID \
