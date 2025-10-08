@@ -402,8 +402,8 @@ jobs:
           REPO: ${{ env.REPO_SLACK }}
         run: |
           COMMAND_ID=$(aws ssm send-command \
-            --targets "Key=instanceIds,Values=${EC2_ID}" \
-            --region ${AWS_REGION} \
+            --targets "Key=instanceIds,Values=${{ secrets.EC2_INSTANCE_ID }}" \
+            --region ${{ secrets.AWS_REGION }} \
             --document-name "AWS-RunShellScript" \
             --comment "Deploy Slack connector from CodeArtifact and manage systemd" \
             --parameters 'commands=[
@@ -414,6 +414,7 @@ jobs:
               "GROUP_ID=org.springframework",
               "ARTIFACT_ID=connector-slack",
               "VERSION=$(aws codeartifact list-package-versions \
+                --region ${AWS_REGION} \
                 --domain ${DOMAIN} \
                 --domain-owner ${DOMAIN_OWNER} \
                 --repository ${REPO} \
