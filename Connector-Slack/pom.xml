@@ -21,4 +21,11 @@
       <version>1.0.0</version>
     </dependency>
   </dependencies>
+  <distributionManagement>
+    <repository>
+      <id>my-domain-connector-slack</id>
+      <name>my-domain-connector-slack</name>
+      <url>https://my-domain-476114132725.d.codeartifact.us-east-1.amazonaws.com/maven/connector-slack/</url>
+    </repository>
+  </distributionManagement>
 </project>

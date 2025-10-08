@@ -15,4 +15,11 @@
   <packaging>jar</packaging>
 
   <name>Common Utilities</name>
+  <distributionManagement>
+    <repository>
+      <id>my-domain-common-lib</id>
+      <name>my-domain-common-lib</name>
+      <url>https://my-domain-476114132725.d.codeartifact.us-east-1.amazonaws.com/maven/common-lib/</url>
+    </repository>
+  </distributionManagement>
 </project>

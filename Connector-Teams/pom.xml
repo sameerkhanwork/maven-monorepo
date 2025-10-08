@@ -21,4 +21,11 @@
       <version>1.0.0</version>
     </dependency>
   </dependencies>
+  <distributionManagement>
+    <repository>
+      <id>my-domain-connector-teams</id>
+      <name>my-domain-connector-teams</name>
+      <url>https://my-domain-476114132725.d.codeartifact.us-east-1.amazonaws.com/maven/connector-teams/</url>
+    </repository>
+  </distributionManagement>
 </project>

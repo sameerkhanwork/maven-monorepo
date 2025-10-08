@@ -1,0 +1,556 @@
+name: Maven Monorepo Build, Publish & Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'Common/**'
+      - 'Connector-Slack/**'
+      - 'Connector-Teams/**'
+      - '.github/workflows/**'
+
+concurrency:
+  group: maven-monorepo-deploy
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  DOMAIN: ${{ secrets.AWS_CODEARTIFACT_DOMAIN }}
+  DOMAIN_OWNER: ${{ secrets.AWS_ACCOUNT_ID }}
+  # Change these repo names to match your CodeArtifact repos if different
+  REPO_SLACK: connector-slack
+  REPO_TEAMS: connector-teams
+  REPO_COMMON: common-lib
+  COMMON_DIR: Common
+  SLACK_DIR: Connector-Slack
+  TEAMS_DIR: Connector-Teams
+
+jobs:
+  detect-changes:
+    name: Detect changed modules
+    runs-on: ubuntu-latest
+    outputs:
+      common_changed: ${{ steps.filter.outputs.common }}
+      slack_changed: ${{ steps.filter.outputs.slack }}
+      teams_changed: ${{ steps.filter.outputs.teams }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed directories (paths-filter)
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            common:
+              - 'Common/**'
+            slack:
+              - 'Connector-Slack/**'
+            teams:
+              - 'Connector-Teams/**'
+
+  # -------------------------
+  # Build & deploy Common (if changed)
+  # -------------------------
+  build-and-publish-common:
+    name: Build & Publish Common
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.common_changed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-session-name: GitHubActionsCommonPublish
+
+      - name: Get CodeArtifact token & repo endpoint (Common)
+        run: |
+          TOKEN=$(aws codeartifact get-authorization-token \
+            --domain "${{ env.DOMAIN }}" \
+            --domain-owner "${{ secrets.AWS_ACCOUNT_ID }}" \
+            --region "${{ secrets.AWS_REGION }}" \
+            --query authorizationToken --output text)
+          echo "CODEARTIFACT_AUTH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          echo "::add-mask::$TOKEN"
+
+          REPO_ENDPOINT=$(aws codeartifact get-repository-endpoint \
+            --domain "${{ env.DOMAIN }}" \
+            --domain-owner "${{ secrets.AWS_ACCOUNT_ID }}" \
+            --repository "${{ env.REPO_COMMON }}" \
+            --format maven \
+            --query repositoryEndpoint --output text)
+          echo "CODEARTIFACT_REPO_ENDPOINT=$REPO_ENDPOINT" >> "$GITHUB_ENV"
+          echo "Repo endpoint: $REPO_ENDPOINT"
+
+      - name: Write ~/.m2/settings.xml (Common)
+        env:
+          CODEARTIFACT_AUTH_TOKEN: ${{ env.CODEARTIFACT_AUTH_TOKEN }}
+          CODEARTIFACT_REPO_ENDPOINT: ${{ env.CODEARTIFACT_REPO_ENDPOINT }}
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<EOF
+          <settings>
+            <servers>
+              <server>
+                <id>codeartifact-common</id>
+                <username>aws</username>
+                <password>${CODEARTIFACT_AUTH_TOKEN}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>codeartifact-common</id>
+                <activation>
+                  <activeByDefault>true</activeByDefault>
+                </activation>
+                <repositories>
+                  <repository>
+                    <id>codeartifact-common</id>
+                    <url>${CODEARTIFACT_REPO_ENDPOINT}</url>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+          </settings>
+          EOF
+
+      - name: Build & Deploy Common to CodeArtifact
+        working-directory: ${{ env.COMMON_DIR }}
+        env:
+          CODEARTIFACT_REPO_ENDPOINT: ${{ env.CODEARTIFACT_REPO_ENDPOINT }}
+        run: |
+          mvn -s ~/.m2/settings.xml -B -T 1C deploy -DskipTests -Dspotless.check.skip=true \
+            -Dcodeartifact.url="${CODEARTIFACT_REPO_ENDPOINT}" \
+            -DretryFailedDeploymentCount=2
+
+  # -------------------------
+  # Build & Publish Slack Connector
+  # -------------------------
+  build-and-publish-slack:
+    name: Build & Publish Connector-Slack
+    needs: [detect-changes, build-and-publish-common]
+    # run if Slack changed OR Common changed (so Slack can pick up Common changes)
+    if: ${{ needs.detect-changes.outputs.slack_changed == 'true' || needs.detect-changes.outputs.common_changed == 'true' }}
+    runs-on: ubuntu-latest
+    environment: uat
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-session-name: GitHubActionsSlackPublish
+
+      - name: Get CodeArtifact token & repo endpoint (Slack)
+        run: |
+          TOKEN=$(aws codeartifact get-authorization-token \
+            --domain "${{ env.DOMAIN }}" \
+            --domain-owner "${{ secrets.AWS_ACCOUNT_ID }}" \
+            --region "${{ secrets.AWS_REGION }}" \
+            --query authorizationToken --output text)
+          echo "CODEARTIFACT_AUTH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          echo "::add-mask::$TOKEN"
+
+          REPO_ENDPOINT=$(aws codeartifact get-repository-endpoint \
+            --domain "${{ env.DOMAIN }}" \
+            --domain-owner "${{ secrets.AWS_ACCOUNT_ID }}" \
+            --repository "${{ env.REPO_SLACK }}" \
+            --format maven \
+            --query repositoryEndpoint --output text)
+          echo "CODEARTIFACT_REPO_ENDPOINT=$REPO_ENDPOINT" >> "$GITHUB_ENV"
+          echo "Repo endpoint: $REPO_ENDPOINT"
+          COMMON_REPO_ENDPOINT=$(aws codeartifact get-repository-endpoint \
+            --domain "${{ env.DOMAIN }}" \
+            --domain-owner "${{ secrets.AWS_ACCOUNT_ID }}" \
+            --repository "${{ env.REPO_COMMON }}" \
+            --format maven \
+            --query repositoryEndpoint --output text)
+          echo "COMMON_REPO_ENDPOINT=$COMMON_REPO_ENDPOINT" >> "$GITHUB_ENV"
+          echo "common endpoint: $COMMON_REPO_ENDPOINT"
+
+      - name: Write ~/.m2/settings.xml (Slack)
+        env:
+          CODEARTIFACT_AUTH_TOKEN: ${{ env.CODEARTIFACT_AUTH_TOKEN }}
+          CODEARTIFACT_REPO_ENDPOINT: ${{ env.CODEARTIFACT_REPO_ENDPOINT }}
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<EOF
+          <settings>
+            <servers>
+              <server>
+                <id>codeartifact-common</id>
+                <username>aws</username>
+                <password>${CODEARTIFACT_AUTH_TOKEN}</password>
+              </server>
+              <server>
+                <id>codeartifact-slack</id>
+                <username>aws</username>
+                <password>${CODEARTIFACT_AUTH_TOKEN}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>codeartifact-slack</id>
+                <activation>
+                  <activeByDefault>true</activeByDefault>
+                </activation>
+                <repositories>
+                  <repository>
+                    <id>codeartifact-common</id>
+                    <url>${COMMON_REPO_ENDPOINT}</url>
+                  </repository>
+                  <repository>
+                    <id>codeartifact-slack</id>
+                    <url>${CODEARTIFACT_REPO_ENDPOINT}</url>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+          </settings>
+          EOF
+
+      - name: Build & Deploy Connector-Slack to CodeArtifact
+        working-directory: ${{ env.SLACK_DIR }}
+        env:
+          CODEARTIFACT_REPO_ENDPOINT: ${{ env.CODEARTIFACT_REPO_ENDPOINT }}
+        run: |
+          mvn -s ~/.m2/settings.xml -B -T 1C deploy -DskipTests -Dspotless.check.skip=true \
+            -Dcodeartifact.url="${CODEARTIFACT_REPO_ENDPOINT}" \
+            -DretryFailedDeploymentCount=2
+
+  # -------------------------
+  # Build & Publish Teams Connector
+  # -------------------------
+  build-and-publish-teams:
+    name: Build & Publish Connector-Teams
+    needs: [detect-changes, build-and-publish-common]
+    if: ${{ needs.detect-changes.outputs.teams_changed == 'true' || needs.detect-changes.outputs.common_changed == 'true' }}
+    runs-on: ubuntu-latest
+    environment: uat
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-session-name: GitHubActionsTeamsPublish
+
+      - name: Get CodeArtifact token & repo endpoint (Teams)
+        run: |
+          TOKEN=$(aws codeartifact get-authorization-token \
+            --domain "${{ env.DOMAIN }}" \
+            --domain-owner "${{ secrets.AWS_ACCOUNT_ID }}" \
+            --region "${{ secrets.AWS_REGION }}" \
+            --query authorizationToken --output text)
+          echo "CODEARTIFACT_AUTH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          echo "::add-mask::$TOKEN"
+
+          REPO_ENDPOINT=$(aws codeartifact get-repository-endpoint \
+            --domain "${{ env.DOMAIN }}" \
+            --domain-owner "${{ secrets.AWS_ACCOUNT_ID }}" \
+            --repository "${{ env.REPO_TEAMS }}" \
+            --format maven \
+            --query repositoryEndpoint --output text)
+          echo "CODEARTIFACT_REPO_ENDPOINT=$REPO_ENDPOINT" >> "$GITHUB_ENV"
+          echo "Repo endpoint: $REPO_ENDPOINT"
+          COMMON_REPO_ENDPOINT=$(aws codeartifact get-repository-endpoint \
+            --domain "${{ env.DOMAIN }}" \
+            --domain-owner "${{ secrets.AWS_ACCOUNT_ID }}" \
+            --repository "${{ env.REPO_COMMON }}" \
+            --format maven \
+            --query repositoryEndpoint --output text)
+          echo "COMMON_REPO_ENDPOINT=$COMMON_REPO_ENDPOINT" >> "$GITHUB_ENV"
+          echo "common endpoint: $COMMON_REPO_ENDPOINT"
+
+      - name: Write ~/.m2/settings.xml (Teams)
+        env:
+          CODEARTIFACT_AUTH_TOKEN: ${{ env.CODEARTIFACT_AUTH_TOKEN }}
+          CODEARTIFACT_REPO_ENDPOINT: ${{ env.CODEARTIFACT_REPO_ENDPOINT }}
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<EOF
+          <settings>
+            <servers>
+              <server>
+                <id>codeartifact-common</id>
+                <username>aws</username>
+                <password>${CODEARTIFACT_AUTH_TOKEN}</password>
+              </server>            
+              <server>
+                <id>codeartifact-teams</id>
+                <username>aws</username>
+                <password>${CODEARTIFACT_AUTH_TOKEN}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>codeartifact-teams</id>
+                <activation>
+                  <activeByDefault>true</activeByDefault>
+                </activation>
+                <repositories>
+                  <repository>
+                    <id>codeartifact-common</id>
+                    <url>${COMMON_REPO_ENDPOINT}</url>
+                  </repository>
+                  <repository>
+                    <id>codeartifact-teams</id>
+                    <url>${CODEARTIFACT_REPO_ENDPOINT}</url>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+          </settings>
+          EOF
+
+      - name: Build & Deploy Connector-Teams to CodeArtifact
+        working-directory: ${{ env.TEAMS_DIR }}
+        env:
+          CODEARTIFACT_REPO_ENDPOINT: ${{ env.CODEARTIFACT_REPO_ENDPOINT }}
+        run: |
+          mvn -s ~/.m2/settings.xml -B -T 1C deploy -DskipTests -Dspotless.check.skip=true\
+            -Dcodeartifact.url="${CODEARTIFACT_REPO_ENDPOINT}" \
+            -DretryFailedDeploymentCount=2
+
+  # -------------------------
+  # Debug step (runs on failure of any publish job)
+  # -------------------------
+  debug-on-failure:
+    name: Debug on failure
+    needs: [build-and-publish-common, build-and-publish-slack, build-and-publish-teams]
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Debug info (STS identity + endpoints + repo policy)
+        run: |
+          echo "Caller identity:"
+          aws sts get-caller-identity || true
+          echo "Slack repo endpoint:"
+          aws codeartifact get-repository-endpoint --domain "${{ env.DOMAIN }}" --domain-owner "${{ secrets.AWS_ACCOUNT_ID }}" --repository "${{ env.REPO_SLACK }}" --format maven || true
+          echo "Teams repo endpoint:"
+          aws codeartifact get-repository-endpoint --domain "${{ env.DOMAIN }}" --domain-owner "${{ secrets.AWS_ACCOUNT_ID }}" --repository "${{ env.REPO_TEAMS }}" --format maven || true
+          echo "Repo permissions (may require permission):"
+          aws codeartifact get-repository-permissions-policy --domain "${{ env.DOMAIN }}" --domain-owner "${{ secrets.AWS_ACCOUNT_ID }}" --repository "${{ env.REPO_SLACK }}" || true
+          echo "Try HEAD to repo endpoints (if set):"
+          REPO_SLACK_ENDPOINT=$(aws codeartifact get-repository-endpoint --domain "${{ env.DOMAIN }}" --domain-owner "${{ secrets.AWS_ACCOUNT_ID }}" --repository "${{ env.REPO_SLACK }}" --format maven --query repositoryEndpoint --output text || true)
+          curl -I "$REPO_SLACK_ENDPOINT" || true
+
+  # -------------------------
+  # Deploy Slack to EC2 via SSM
+  # -------------------------
+  deploy-slack-ec2:
+    name: Deploy Slack Connector to EC2
+    needs: build-and-publish-slack
+    if: ${{ needs.build-and-publish-slack.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Slack on EC2 via SSM (systemd)
+        env:
+          EC2_ID: ${{ secrets.EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          DOMAIN: ${{ env.DOMAIN }}
+          DOMAIN_OWNER: ${{ secrets.AWS_ACCOUNT_ID }}
+          REPO: ${{ env.REPO_SLACK }}
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --targets "Key=instanceIds,Values=${EC2_ID}" \
+            --region ${AWS_REGION} \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy Slack connector from CodeArtifact and manage systemd" \
+            --parameters 'commands=[
+              "bash -c \"set -euo pipefail;
+              APP_NAME=connector-slack.jar;
+              SERVICE_NAME=slack-service;
+              DEPLOY_DIR=/home/ssm-user/app/slack;
+              GROUP_ID=org.springframework;
+              ARTIFACT_ID=connector-slack;
+              # auto-detect latest version (most recently published)
+              VERSION=\\$(aws codeartifact list-package-versions \
+                --domain '"'"${DOMAIN}"'"' \
+                --domain-owner '"'"${DOMAIN_OWNER}"'"' \
+                --repository '"'"${REPO}"'"' \
+                --package '"'"${ARTIFACT_ID}"'"' \
+                --namespace '"'"${GROUP_ID}"'"' \
+                --format maven \
+                --query \"sort_by(versions, &publishedTime)[-1].version\" \
+                --output text);
+              echo Detected version: \\$VERSION;
+              echo Creating deploy dir; mkdir -p \\$DEPLOY_DIR;
+              ASSET=\\$(aws codeartifact list-package-version-assets \
+                --domain '"'"${DOMAIN}"'"' \
+                --domain-owner '"'"${DOMAIN_OWNER}"'"' \
+                --repository '"'"${REPO}"'"' \
+                --format maven \
+                --namespace \\$GROUP_ID \
+                --package \\$ARTIFACT_ID \
+                --package-version \\$VERSION \
+                --query \"assets[?ends_with(name, \\\`.jar\\\`)].name\" \
+                --output text);
+              echo Found asset: \\$ASSET;
+              aws codeartifact get-package-version-asset \
+                --domain '"'"${DOMAIN}"'"' \
+                --domain-owner '"'"${DOMAIN_OWNER}"'"' \
+                --repository '"'"${REPO}"'"' \
+                --format maven \
+                --namespace \\$GROUP_ID \
+                --package \\$ARTIFACT_ID \
+                --package-version \\$VERSION \
+                --asset \\$ASSET \\$DEPLOY_DIR/\\$APP_NAME;
+              echo Writing systemd unit for \\$SERVICE_NAME;
+              sudo bash -c \"cat > /etc/systemd/system/\\${SERVICE_NAME}.service <<'EOL'
+          [Unit]
+          Description=Slack Connector Service
+          After=network.target
+
+          [Service]
+          User=ssm-user
+          WorkingDirectory=/home/ssm-user/app/slack
+          ExecStart=/usr/bin/java -Dspring.profiles.active=uat -jar /home/ssm-user/app/slack/connector-slack.jar --server.port=8082
+          SuccessExitStatus=143
+          Restart=always
+          RestartSec=5
+          Environment=SPRING_PROFILES_ACTIVE=uat
+
+          [Install]
+          WantedBy=multi-user.target
+          EOL\";
+              sudo systemctl daemon-reload;
+              sudo systemctl stop \\${SERVICE_NAME} || true;
+              sudo systemctl start \\${SERVICE_NAME};
+              sudo systemctl enable \\${SERVICE_NAME};
+              sudo systemctl status \\${SERVICE_NAME} --no-pager;
+              sudo journalctl -u \\${SERVICE_NAME} -n 50 --no-pager;
+              \"'
+            ]' --output json | jq -r '.Command.CommandId')
+          echo "SSM Command ID: $COMMAND_ID"
+          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "${EC2_ID}"
+
+  # -------------------------
+  # Deploy Teams to EC2 via SSM
+  # -------------------------
+  deploy-teams-ec2:
+    name: Deploy Teams Connector to EC2
+    needs: build-and-publish-teams
+    if: ${{ needs.build-and-publish-teams.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Teams on EC2 via SSM (systemd)
+        env:
+          EC2_ID: ${{ secrets.EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          DOMAIN: ${{ env.DOMAIN }}
+          DOMAIN_OWNER: ${{ secrets.AWS_ACCOUNT_ID }}
+          REPO: ${{ env.REPO_TEAMS }}
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --targets "Key=instanceIds,Values=${EC2_ID}" \
+            --region ${AWS_REGION} \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy Teams connector from CodeArtifact and manage systemd" \
+            --parameters 'commands=[
+              "bash -c \"set -euo pipefail;
+              APP_NAME=connector-teams.jar;
+              SERVICE_NAME=teams-service;
+              DEPLOY_DIR=/home/ssm-user/app/teams;
+              GROUP_ID=org.springframework;
+              ARTIFACT_ID=connector-teams;
+              VERSION=\\$(aws codeartifact list-package-versions \
+                --domain '"'"${DOMAIN}"'"' \
+                --domain-owner '"'"${DOMAIN_OWNER}"'"' \
+                --repository '"'"${REPO}"'"' \
+                --package '"'"${ARTIFACT_ID}"'"' \
+                --namespace '"'"${GROUP_ID}"'"' \
+                --format maven \
+                --query \"sort_by(versions, &publishedTime)[-1].version\" \
+                --output text);
+              echo Detected version: \\$VERSION;
+              mkdir -p \\$DEPLOY_DIR;
+              ASSET=\\$(aws codeartifact list-package-version-assets \
+                --domain '"'"${DOMAIN}"'"' \
+                --domain-owner '"'"${DOMAIN_OWNER}"'"' \
+                --repository '"'"${REPO}"'"' \
+                --format maven \
+                --namespace \\$GROUP_ID \
+                --package \\$ARTIFACT_ID \
+                --package-version \\$VERSION \
+                --query \"assets[?ends_with(name, \\\`.jar\\\`)].name\" \
+                --output text);
+              echo Found asset: \\$ASSET;
+              aws codeartifact get-package-version-asset \
+                --domain '"'"${DOMAIN}"'"' \
+                --domain-owner '"'"${DOMAIN_OWNER}"'"' \
+                --repository '"'"${REPO}"'"' \
+                --format maven \
+                --namespace \\$GROUP_ID \
+                --package \\$ARTIFACT_ID \
+                --package-version \\$VERSION \
+                --asset \\$ASSET \\$DEPLOY_DIR/\\$APP_NAME;
+              sudo bash -c \"cat > /etc/systemd/system/\\${SERVICE_NAME}.service <<'EOL'
+          [Unit]
+          Description=Teams Connector Service
+          After=network.target
+
+          [Service]
+          User=ssm-user
+          WorkingDirectory=/home/ssm-user/app/teams
+          ExecStart=/usr/bin/java -Dspring.profiles.active=uat -jar /home/ssm-user/app/teams/connector-teams.jar --server.port=8083
+          SuccessExitStatus=143
+          Restart=always
+          RestartSec=5
+          Environment=SPRING_PROFILES_ACTIVE=uat
+
+          [Install]
+          WantedBy=multi-user.target
+          EOL\";
+              sudo systemctl daemon-reload;
+              sudo systemctl stop \\${SERVICE_NAME} || true;
+              sudo systemctl start \\${SERVICE_NAME};
+              sudo systemctl enable \\${SERVICE_NAME};
+              sudo systemctl status \\${SERVICE_NAME} --no-pager;
+              sudo journalctl -u \\${SERVICE_NAME} -n 50 --no-pager;
+              \"'
+            ]' --output json | jq -r '.Command.CommandId')
+          echo "SSM Command ID: $COMMAND_ID"
+          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "${EC2_ID}"
