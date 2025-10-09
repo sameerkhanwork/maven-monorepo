@@ -46,7 +46,7 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           base: ${{ github.event.before }}
-          ref: ${{ github.even.after }}
+          ref: ${{ github.event.after }}
           filters: |
             common:
               - 'Common/**'
