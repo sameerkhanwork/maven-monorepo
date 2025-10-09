@@ -4,6 +4,6 @@ import com.ai.connector.common.Utils;
 
 public class SlackApp {
     public static void main(String[] args) {
-        System.out.println(Utils.greet("Slack"));
+        System.out.println(Utils.greet("Slack testing"));
     }
 }
