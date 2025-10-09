@@ -135,7 +135,7 @@ jobs:
         env:
           CODEARTIFACT_REPO_ENDPOINT: ${{ env.CODEARTIFACT_REPO_ENDPOINT }}
         run: |
-          mvn -s ~/.m2/settings.xml -B -T 1C deploy -DskipTests -Dspotless.check.skip=true \
+          mvn -s ~/.m2/settings.xml -B -T 1C deploy -U -DskipTests -Dspotless.check.skip=true \
             -Dcodeartifact.url="${CODEARTIFACT_REPO_ENDPOINT}" \
             -DretryFailedDeploymentCount=2
 
@@ -240,7 +240,7 @@ jobs:
         env:
           CODEARTIFACT_REPO_ENDPOINT: ${{ env.CODEARTIFACT_REPO_ENDPOINT }}
         run: |
-          mvn -s ~/.m2/settings.xml -B -T 1C deploy -DskipTests -Dspotless.check.skip=true \
+          mvn -s ~/.m2/settings.xml -B -T 1C deploy -U -DskipTests -Dspotless.check.skip=true \
             -Dcodeartifact.url="${CODEARTIFACT_REPO_ENDPOINT}" \
             -DretryFailedDeploymentCount=2
 
@@ -344,7 +344,7 @@ jobs:
         env:
           CODEARTIFACT_REPO_ENDPOINT: ${{ env.CODEARTIFACT_REPO_ENDPOINT }}
         run: |
-          mvn -s ~/.m2/settings.xml -B -T 1C deploy -DskipTests -Dspotless.check.skip=true\
+          mvn -s ~/.m2/settings.xml -B -T 1C deploy -U -DskipTests -Dspotless.check.skip=true\
             -Dcodeartifact.url="${CODEARTIFACT_REPO_ENDPOINT}" \
             -DretryFailedDeploymentCount=2
 
