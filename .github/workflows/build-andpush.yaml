@@ -46,7 +46,7 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           base: ${{ github.event.before }}
-          ref: ${{ github.event.after }}
+          ref: ${{ github.sha }}
           filters: |
             common:
               - 'Common/**'
@@ -61,7 +61,7 @@ jobs:
   build-and-publish-common:
     name: Build & Publish Common
     needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.common_changed == 'true' }}
+    if: ${{ needs.detect-changes.outputs.common_changed }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -148,7 +148,7 @@ jobs:
     name: Build & Publish Connector-Slack
     needs: [detect-changes, build-and-publish-common]
     # run if Slack changed OR Common changed (so Slack can pick up Common changes)
-    if: ${{ needs.detect-changes.outputs.slack_changed == 'true' || needs.detect-changes.outputs.common_changed == 'true' }}
+    if: ${{ needs.detect-changes.outputs.slack_changed || needs.detect-changes.outputs.common_changed }}
     runs-on: ubuntu-latest
     environment: uat
     steps:
@@ -252,7 +252,7 @@ jobs:
   build-and-publish-teams:
     name: Build & Publish Connector-Teams
     needs: [detect-changes, build-and-publish-common]
-    if: ${{ needs.detect-changes.outputs.teams_changed == 'true' || needs.detect-changes.outputs.common_changed == 'true'}}
+    if: ${{ needs.detect-changes.outputs.teams_changed || needs.detect-changes.outputs.common_changed }}
     runs-on: ubuntu-latest
     environment: uat
     steps:
