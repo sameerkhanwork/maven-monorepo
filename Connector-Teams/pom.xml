@@ -28,4 +28,20 @@
       <url>https://my-domain-476114132725.d.codeartifact.us-east-1.amazonaws.com/maven/connector-teams/</url>
     </repository>
   </distributionManagement>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <version>3.2.0</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
